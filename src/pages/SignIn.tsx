@@ -29,8 +29,9 @@ const SignInPage: React.FC = () => {
         email: credentials.email,
         password: credentials.password
       })
+      const { accessToken, user } = response.data.data;
       if (response.status == 200)
-        loginState(response.data.data.accessToken)
+        loginState(accessToken, user)
       navigate('/')
     } catch (err: unknown) {
       isAxiosError(err) && err?.response ?

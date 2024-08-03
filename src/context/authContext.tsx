@@ -4,18 +4,26 @@ import useLocalStorage from "../hooks/useLocalStorage";
 type AuthState = {
     isAuthenticated: boolean | null;
     token: string | null;
+    email: string | null;
 }
 
 type AuthContextType = {
     isAuthenticated: boolean | null;
+    email: string | null;
     token: string | null;
-    loginState: (token: string) => void;
+    loginState: (token: string, email: string) => void;
     logoutState: () => void;
+}
+
+type LoginStateType = {
+    email : string,
+    token : string
 }
 
 const initialState = {
     isAuthenticated: null,
-    token: null
+    token: null,
+    email: null
 }
 
 export const AuthContext = createContext<AuthContextType>({
@@ -24,16 +32,22 @@ export const AuthContext = createContext<AuthContextType>({
     logoutState: () => { },
 });
 
-const reducer = (state: AuthState, action: { type: string, payload: string | null }) => {
+type ActionType = 
+    | { type: 'LOGIN', payload: LoginStateType }
+    | { type: 'LOGOUT' };
+
+const reducer = (state: AuthState, action: ActionType) => {
     switch (action.type) {
         case 'LOGIN':
             return {
                 isAuthenticated: true,
-                token: action.payload,
+                token: action.payload.token,
+                email: action.payload.email
             }
         case 'LOGOUT':
             return {
                 isAuthenticated: false,
+                email: null,
                 token: null,
             }
         default:
@@ -42,38 +56,39 @@ const reducer = (state: AuthState, action: { type: string, payload: string | nul
 }
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-    const [accessToken, setToken, clearToken] = useLocalStorage('accessToken', ' ');
+    const [accessToken, setToken, clearToken] = useLocalStorage<string | null>('accessToken', null);
+    const [email, setEmail, clearEmail] = useLocalStorage<string | null>('email', null)
     const [state, dispatch] = useReducer(reducer, initialState);
 
-    const loginState = useCallback((token: string) => {
+    const loginState = useCallback((token: string, email: string) => {
         setToken(token);
+        setEmail(email)
         dispatch({
             type: 'LOGIN',
-            payload: token,
+            payload: {token, email}
         })
-    }, [setToken])
+    }, [setToken, setEmail])
 
     const logoutState = useCallback(() => {
         clearToken();
+        clearEmail();
         dispatch({
             type: 'LOGOUT',
-            payload: null,
         })
-    }, [clearToken])
+    }, [clearToken, clearEmail])
 
     useEffect(() => {
-        if (accessToken) {
+        if (accessToken && email) {
             dispatch({
                 type: 'LOGIN',
-                payload: accessToken,
-            })
+                payload: { token: accessToken, email },
+            });
         } else {
             dispatch({
                 type: 'LOGOUT',
-                payload: null,
-            })
+            });
         }
-    }, [accessToken])
+    }, [accessToken, email])
 
     return (
         <AuthContext.Provider value={{ ...state, loginState, logoutState }}>
