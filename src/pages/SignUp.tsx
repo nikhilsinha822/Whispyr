@@ -1,7 +1,6 @@
-import React, { useState, FormEvent, useContext } from 'react';
+import React, { useState, FormEvent } from 'react';
 import logo from '../assets/logo.svg'
 import { Link } from 'react-router-dom';
-import { AuthContext } from '../context/authContext';
 import axios, { isAxiosError } from 'axios'
 import { useNavigate } from 'react-router-dom';
 
@@ -13,7 +12,6 @@ const SignupPage: React.FC = () => {
     });
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(false);
-    const { loginState } = useContext(AuthContext);
     const navigate = useNavigate();
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>): void => {
@@ -26,14 +24,11 @@ const SignupPage: React.FC = () => {
         e.preventDefault();
         try {
             setIsLoading(true);
-            const response = await axios.post(`${import.meta.env.VITE_BASE_URL}/auth/register`, {
+            await axios.post(`${import.meta.env.VITE_BASE_URL}/auth/register`, {
                 email: credentials.email,
                 password: credentials.password
             })
-            const { accessToken, user } = response.data.data;
-            if (response.status == 200)
-                loginState(accessToken, user)
-            navigate('/')
+            navigate('/emailSent')
         } catch (err: unknown) {
             isAxiosError(err) ?
                 setError(err?.response?.data.message) :

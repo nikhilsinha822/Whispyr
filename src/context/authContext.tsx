@@ -1,29 +1,34 @@
 import { ReactNode, createContext, useEffect, useReducer, useCallback } from "react";
 import useLocalStorage from "../hooks/useLocalStorage";
 
+type userType = {
+    email: string,
+    _id: string
+}
+
 type AuthState = {
     isAuthenticated: boolean | null;
     token: string | null;
-    email: string | null;
+    user: userType | null;
 }
 
 type AuthContextType = {
     isAuthenticated: boolean | null;
-    email: string | null;
+    user: userType | null;
     token: string | null;
-    loginState: (token: string, email: string) => void;
+    loginState: (token: string, user: userType) => void;
     logoutState: () => void;
 }
 
 type LoginStateType = {
-    email : string,
+    user : userType,
     token : string
 }
 
 const initialState = {
     isAuthenticated: null,
     token: null,
-    email: null
+    user: null
 }
 
 export const AuthContext = createContext<AuthContextType>({
@@ -42,12 +47,12 @@ const reducer = (state: AuthState, action: ActionType) => {
             return {
                 isAuthenticated: true,
                 token: action.payload.token,
-                email: action.payload.email
+                user: action.payload.user
             }
         case 'LOGOUT':
             return {
                 isAuthenticated: false,
-                email: null,
+                user: null,
                 token: null,
             }
         default:
@@ -57,38 +62,38 @@ const reducer = (state: AuthState, action: ActionType) => {
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [accessToken, setToken, clearToken] = useLocalStorage<string | null>('accessToken', null);
-    const [email, setEmail, clearEmail] = useLocalStorage<string | null>('email', null)
+    const [user, setUser, clearUser] = useLocalStorage<userType | null>('user', null)
     const [state, dispatch] = useReducer(reducer, initialState);
 
-    const loginState = useCallback((token: string, email: string) => {
+    const loginState = useCallback((token: string, user: userType) => {
         setToken(token);
-        setEmail(email)
+        setUser(user)
         dispatch({
             type: 'LOGIN',
-            payload: {token, email}
+            payload: {token, user}
         })
-    }, [setToken, setEmail])
+    }, [setToken, setUser])
 
     const logoutState = useCallback(() => {
         clearToken();
-        clearEmail();
+        clearUser();
         dispatch({
             type: 'LOGOUT',
         })
-    }, [clearToken, clearEmail])
+    }, [clearToken, clearUser])
 
     useEffect(() => {
-        if (accessToken && email) {
+        if (accessToken && user) {
             dispatch({
                 type: 'LOGIN',
-                payload: { token: accessToken, email },
+                payload: { token: accessToken, user },
             });
         } else {
             dispatch({
                 type: 'LOGOUT',
             });
         }
-    }, [accessToken, email])
+    }, [accessToken, user])
 
     return (
         <AuthContext.Provider value={{ ...state, loginState, logoutState }}>

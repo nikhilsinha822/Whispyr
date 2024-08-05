@@ -29,7 +29,8 @@ const SignInPage: React.FC = () => {
         email: credentials.email,
         password: credentials.password
       })
-      const { accessToken, user } = response.data.data;
+      const { accessToken, email, _id } = response.data.data;
+      const user = {email, _id};
       if (response.status == 200)
         loginState(accessToken, user)
       navigate('/')
