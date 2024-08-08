@@ -5,8 +5,11 @@ export default {
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      backgroundImage: {
+        "dotted-pattern": "url('/subtle_dots.png')"
+      }
+    },
   },
   plugins: [],
 }
-

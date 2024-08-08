@@ -2,6 +2,7 @@ import { useEffect, useContext, useState } from 'react'
 import { AuthContext } from '../../context/authContext'
 import axios from 'axios'
 import ChatList from './ChatList'
+import Conversation from './Conversation'
 
 const Chat = () => {
     const { token } = useContext(AuthContext);
@@ -35,11 +36,11 @@ const Chat = () => {
     if (isError || !convList)
         return <div>There was some problem is loading the chats.</div>
 
-    return <div className='flex w-max-full'>
+    return <div className='flex'>
         <ChatList
             convList={convList}
         />
-        <div>chatMessage</div>
+        <Conversation/>
     </div>;
 }
 

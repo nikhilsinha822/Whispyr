@@ -24,34 +24,20 @@ const ChatList: React.FC<ChatListPropsType> = ({ convList }) => {
                 {convList.map((conv) => (
                     <div key={uuid()}
                         className="hover:cursor-pointer"
-                        onClick={() => setSearchParams({ activeConv: conv._id })}
+                        onClick={() => setSearchParams({ activeConv: conv._id }, { replace: true })}
                     >
                         {conv.type === 0 ? <IndvConv conv={conv} /> : <GroupConv conv={conv} />}
                     </div>
                 ))}
             </div>
-            <style>{`
-                .custom-scrollbar::-webkit-scrollbar {
-                    width: 4px;
-                }
-                .custom-scrollbar::-webkit-scrollbar-track {
-                    background: #f1f1f1;
-                }
-                .custom-scrollbar::-webkit-scrollbar-thumb {
-                    background: #888;
-                    border-radius: 4px;
-                }
-                .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-                    background: #555;
-                }
-            `}</style>
         </div>
     );
 };
 
 const IndvConv: React.FC<ConversationPropsType> = ({ conv }) => {
-    const { email } = useContext(AuthContext);
-    const sender = conv.participants.find((participant) => participant.email !== email);
+    const { user, logoutState } = useContext(AuthContext);
+    if(!user) logoutState();
+    const sender = conv.participants.find((participant) => participant.email !== user?.email);
     const displayName = conv.name || sender?.name || sender?.email || "Unknown";
 
     return (
