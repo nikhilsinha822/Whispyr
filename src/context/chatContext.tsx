@@ -21,6 +21,7 @@ export const ChatContext = createContext<ChatContextType | undefined>(undefined)
 export const ChatProvider = ({ children }: { children: ReactNode }) => {
     const { token } = useContext(AuthContext);
     const [searchParams,] = useSearchParams();
+    const convId = searchParams.get('activeConv');
     const [convList, setConvList] = useState<ChatListType[] | null>(null);
     const [isErrorConv, setIsErrorConv] = useState(false);
     const [isLoadingConv, setIsLoadingConv] = useState(false);
@@ -30,6 +31,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
     const fetchConversation = useCallback(async () => {
         try {
+            setIsErrorConv(false)
             setIsLoadingConv(true)
             const response = await axios.get(`${import.meta.env.VITE_BASE_URL}/api/chat/chatList`, {
                 headers: {
@@ -45,8 +47,9 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         }
     }, [token])
 
-    const fetchMessage = useCallback(async (convId: string) => {
+    const fetchMessage = useCallback(async () => {
         try {
+            setIsErrorActiveConv(false);
             setIsLoadingActiveConv(true);
             const response = await axios.get(`${import.meta.env.VITE_BASE_URL}/api/chat/chatMessage/${convId}`, {
                 headers: {
@@ -60,17 +63,28 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         } finally {
             setIsLoadingActiveConv(false);
         }
-    }, [token])
+    }, [token, convId])
+
+    const markConversationAsRead = useCallback(() => {
+        setConvList((prevList) =>
+            prevList?.map((conv) =>
+                conv._id === convId ? { ...conv, unreadMessageCount: 0 } : conv
+            ) || null
+        );
+    }, [convId]);
 
     useEffect(() => {
         fetchConversation();
     }, [fetchConversation])
 
     useEffect(() => {
-        const convId = searchParams.get('activeConv');
-        if (convId)
-            fetchMessage(convId)
-    }, [searchParams, fetchMessage])
+        (async () => {
+            if (convId) {
+                await fetchMessage()
+                markConversationAsRead();
+            }
+        })()
+    }, [convId, fetchMessage, markConversationAsRead])
 
     return <ChatContext.Provider value={{
         convList, isErrorConv, isLoadingConv,
