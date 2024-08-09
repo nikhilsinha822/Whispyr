@@ -8,11 +8,11 @@ import Chat from "./pages/Chat"
 const App = () => {
   return (
     <AuthProvider>
-      <Routes>
-        <Route index path="/" element={<AuthComponent children={<Chat />} />} />
-        <Route path="/signin" element={<SignInPage />} />
-        <Route path="/signup" element={<SignUpPage />} />
-      </Routes>
+        <Routes>
+          <Route index path="/" element={<AuthComponent children={<Chat />} />} />
+          <Route path="/signin" element={<SignInPage />} />
+          <Route path="/signup" element={<SignUpPage />} />
+        </Routes>
     </AuthProvider>
   )
 }

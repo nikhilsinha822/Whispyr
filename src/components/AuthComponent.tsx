@@ -1,6 +1,7 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { AuthContext } from '../context/authContext';
+import { ChatProvider } from "../context/chatContext"
 
 const AuthComponent: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { isAuthenticated } = useContext(AuthContext);
@@ -20,7 +21,12 @@ const AuthComponent: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         return <Navigate to='/signin' />;
     }
 
-    return <div>{children}</div>;
+    return (
+        <div>
+            <ChatProvider>
+                {children}
+            </ChatProvider>
+        </div>);
 };
 
 export default AuthComponent;

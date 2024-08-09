@@ -1,11 +1,10 @@
-import { useSearchParams } from "react-router-dom"
 import logo from '../../assets/logo.svg'
-import { useEffect, useContext, useState } from "react";
+import { useContext } from "react";
 import { AuthContext } from "../../context/authContext";
-import axios from 'axios'
 import { MessageType } from "../../types/chat";
 import { v4 as uuid } from 'uuid'
 import { IoMdSend } from "react-icons/io";
+import useChatContext from "../../hooks/useChatContext";
 
 type ActiveConversationPropsType = {
     activeConv: MessageType[]
@@ -16,29 +15,12 @@ type MessagePropsType = {
 }
 
 const Conversation = () => {
-    const [searchParams,] = useSearchParams();
-    const activeConvId = searchParams.get('activeConv');
-    const [activeConv, setActiveConv] = useState();
-    const { token } = useContext(AuthContext)
+    const { activeConv, isErrorActiveConv, isLoadingActiveConv } = useChatContext()
 
-    useEffect(() => {
-        const fetchConversation = async () => {
-            try {
-                const response = await axios.get(`${import.meta.env.VITE_BASE_URL}/api/chat/chatMessage/${activeConvId}`, {
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    }
-                })
-                console.log(response.data.data);
-                setActiveConv(response.data.data);
-            } catch (error) {
-                console.log(error)
-            }
-        }
-        fetchConversation()
-    }, [token, activeConvId])
+    if(isLoadingActiveConv)
+        return <div>Loading Conversation...</div>
 
-    if (!activeConv)
+    if (!activeConv || isErrorActiveConv)
         return <NoActiveConv />
 
     return (
