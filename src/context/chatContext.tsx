@@ -95,6 +95,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
             let updatedConvList = convList.filter((conv) => conv._id !== payload.conversation._id)
             updatedConvList = [newConversation, ...updatedConvList]
             setConvList(updatedConvList);
+            socket.emit("send:receivedMessage", { messageID: payload._id })
 
             if (!activeConv || activeConv._id !== payload.conversation._id) return;
 
@@ -102,6 +103,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
             const updatedMessages = activeConv?.messages.length ?
                 [newMessagePayload, ...activeConv.messages] : [newMessagePayload]
             setActiveConv({ ...activeConv, messages: updatedMessages })
+            socket.emit("send:seenMessage", { messageID: payload._id })
         }
 
         socket.on("receive:newMessage", handleReceiveNewMessage)
@@ -109,6 +111,36 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
             socket.off("receive:newMessage", handleReceiveNewMessage)
         }
     }, [activeConv, convList, socket])
+
+    useEffect(() => {
+        const handleMessageStatus = (payload: MessageType) => {
+            if (!activeConv || payload.conversation !== activeConv?._id) return;
+
+            const updatedStatus = payload.readBy;
+            const messageToUpdate = activeConv.messages.find((message) => message._id === payload._id)
+            if(!messageToUpdate) return;
+
+            const status = messageToUpdate.readBy.map((oldStat) => {
+                const newStatus = updatedStatus.find((stat) => stat._id === oldStat._id)
+                if(!newStatus) return oldStat;
+                return { ...oldStat, status: Math.max(Number(oldStat.status), Number(newStatus.status)) }
+            })
+            console.log("before=>", messageToUpdate.readBy, "update=>",updatedStatus, "after=>", status)
+
+            const updatedMessage = activeConv.messages.map(
+                (message) => message._id === payload._id ? { ...payload, readBy: status } : message)
+
+            setActiveConv({ ...activeConv, messages: updatedMessage })
+        }
+
+        socket.on("receive:receivedMessage", handleMessageStatus)
+        socket.on("receive:seenMessage", handleMessageStatus)
+
+        return () => {
+            socket.off("receive:receivedMessage", handleMessageStatus)
+            socket.off("receive:seenMessage", handleMessageStatus)
+        }
+    }, [activeConv, socket])
 
     return <ChatContext.Provider value={{
         convList, isErrorConv, isLoadingConv,

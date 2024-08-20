@@ -43,7 +43,6 @@ const ActiveConversation = () => {
 
     useEffect(() => {
         const messageUpdateEvent = (payload: SentMessageResponseType) => {
-            console.log("messageUpdateEvent")
             const sentMessageResponse = payload.message;
             const updatedMessage = { ...sentMessageResponse, conversation: sentMessageResponse.conversation._id }
             if (!activeConv || updatedMessage.conversation !== activeConv._id) return;
@@ -52,7 +51,6 @@ const ActiveConversation = () => {
                 [updatedMessage]
 
             setActiveConv({ ...activeConv, messages: updatedConvList })
-            console.log("messageUpdateEvent")
         }
 
         socket.on("messageSent", messageUpdateEvent)
