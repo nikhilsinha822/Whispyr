@@ -18,6 +18,10 @@ type ChatContextType = {
     fetchMessage: () => void;
 }
 
+type ReceivedMessagePayloadType = Omit<MessageType, 'conversation'> & {
+    conversation: ChatListType;
+}
+
 export const ChatContext = createContext<ChatContextType | undefined>(undefined)
 
 export const ChatProvider = ({ children }: { children: ReactNode }) => {
@@ -83,19 +87,28 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     }, [fetchMessage, convId, activeConv]);
 
     useEffect(() => {
-        const handleReceiveNewMessage = (payload: MessageType) => {
-            if (!activeConv || activeConv._id !== payload.conversation) return;
+        const handleReceiveNewMessage = (payload: ReceivedMessagePayloadType) => {
+            if (!convList) return;
 
-            const updatedConvList = activeConv?.messages.length ?
-                [payload, ...activeConv.messages] : [payload]
-            setActiveConv({ ...activeConv, messages: updatedConvList })
+            const unreadMessageCount = (convList.find((conv) => conv._id == payload.conversation._id)?.unreadMessageCount || 0) + 1;
+            const newConversation = { ...payload.conversation, unreadMessageCount };
+            let updatedConvList = convList.filter((conv) => conv._id !== payload.conversation._id)
+            updatedConvList = [newConversation, ...updatedConvList]
+            setConvList(updatedConvList);
+
+            if (!activeConv || activeConv._id !== payload.conversation._id) return;
+
+            const newMessagePayload = { ...payload, conversation: payload.conversation._id }
+            const updatedMessages = activeConv?.messages.length ?
+                [newMessagePayload, ...activeConv.messages] : [newMessagePayload]
+            setActiveConv({ ...activeConv, messages: updatedMessages })
         }
 
         socket.on("receive:newMessage", handleReceiveNewMessage)
         return () => {
             socket.off("receive:newMessage", handleReceiveNewMessage)
         }
-    }, [activeConv, socket])
+    }, [activeConv, convList, socket])
 
     return <ChatContext.Provider value={{
         convList, isErrorConv, isLoadingConv,

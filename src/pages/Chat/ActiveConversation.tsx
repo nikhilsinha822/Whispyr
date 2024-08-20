@@ -6,22 +6,21 @@ import SentMessage from './SentMessage';
 import ReceivedMessage from './ReceivedMessage';
 import useChatContext from "../../hooks/useChatContext";
 import useSocketContext from "../../hooks/useSocketContext";
-import { MessageType } from "../../types/chat";
-import { useSearchParams } from "react-router-dom";
+import { MessageType, ChatListType } from "../../types/chat";
 
 type SentMessageResponseType = {
     success: boolean,
-    message: MessageType
+    message: Omit<MessageType, 'conversation'> & {
+        conversation: ChatListType;
+    }
 }
 
 const ActiveConversation = () => {
     const { user, logoutState } = useContext(AuthContext);
     const { socket } = useSocketContext()
-    const [searchParams,] = useSearchParams()
     const { activeConv, setActiveConv } = useChatContext();
     const [newMessage, setNewMessage] = useState("");
     const [assets,] = useState([]);
-    const convId = searchParams.get('activeConv');
     if (!user) logoutState();
 
     const handleNewMessage = async (e: React.FormEvent) => {
@@ -39,25 +38,28 @@ const ActiveConversation = () => {
             receiverEmail: receiverEmail[0].email,
         }
         socket.emit("send:newMessage", sentMessage);
+        setNewMessage("");
     }
 
     useEffect(() => {
         const messageUpdateEvent = (payload: SentMessageResponseType) => {
-            const sentMessageResponse: MessageType = payload.message;
-            if (!activeConv || sentMessageResponse.conversation !== convId) return;
+            console.log("messageUpdateEvent")
+            const sentMessageResponse = payload.message;
+            const updatedMessage = { ...sentMessageResponse, conversation: sentMessageResponse.conversation._id }
+            if (!activeConv || updatedMessage.conversation !== activeConv._id) return;
             const updatedConvList = activeConv?.messages.length ?
-                [sentMessageResponse, ...activeConv.messages] :
-                [sentMessageResponse]
+                [updatedMessage, ...activeConv.messages] :
+                [updatedMessage]
+
             setActiveConv({ ...activeConv, messages: updatedConvList })
-            console.log("message update evnt is updating active conv")
-            setNewMessage("");
+            console.log("messageUpdateEvent")
         }
 
         socket.on("messageSent", messageUpdateEvent)
         return () => {
             socket.off('messageSent', messageUpdateEvent)
         }
-    }, [activeConv, convId, setActiveConv, socket])
+    }, [activeConv, setActiveConv, socket])
 
     return <div className="h-screen flex flex-col w-2/3">
         <div className="flex flex-col-reverse overflow-y-scroll custom-scrollbar h-full">
@@ -69,6 +71,8 @@ const ActiveConversation = () => {
         </div>
         <form className="flex w-full relative">
             <input
+                id="messageField"
+                name="messageField"
                 className="p-2 border w-full shadow-black shadow-2xl"
                 type="text"
                 value={newMessage}
