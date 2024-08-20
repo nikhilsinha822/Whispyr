@@ -1,33 +1,36 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from "react"
-import { MessageType, ChatListType } from "../types/chat"
+import { ChatListType, ActiveConvType } from "../types/chat"
 import axios from "axios"
 import { AuthContext } from "./authContext";
 import { useSearchParams } from "react-router-dom";
+import useSocketContext from "../hooks/useSocketContext";
+import { MessageType } from "../types/chat";
 
 type ChatContextType = {
     convList: ChatListType[] | null;
     isErrorConv: boolean;
     isLoadingConv: boolean;
-    activeConv: MessageType[] | null;
+    activeConv: ActiveConvType | null;
+    setActiveConv: React.Dispatch<React.SetStateAction<ActiveConvType | null>>;
     isErrorActiveConv: boolean;
     isLoadingActiveConv: boolean;
     fetchConversation: () => void;
-    fetchMessage: (convId: string) => void;
+    fetchMessage: () => void;
 }
-
 
 export const ChatContext = createContext<ChatContextType | undefined>(undefined)
 
 export const ChatProvider = ({ children }: { children: ReactNode }) => {
     const { token } = useContext(AuthContext);
     const [searchParams,] = useSearchParams();
-    const convId = searchParams.get('activeConv');
+    const convId = searchParams.get('activeConv') || null;
     const [convList, setConvList] = useState<ChatListType[] | null>(null);
     const [isErrorConv, setIsErrorConv] = useState(false);
     const [isLoadingConv, setIsLoadingConv] = useState(false);
-    const [activeConv, setActiveConv] = useState<MessageType[] | null>(null);
+    const [activeConv, setActiveConv] = useState<ActiveConvType | null>(null);
     const [isErrorActiveConv, setIsErrorActiveConv] = useState(false);
     const [isLoadingActiveConv, setIsLoadingActiveConv] = useState(false);
+    const { socket } = useSocketContext()
 
     const fetchConversation = useCallback(async () => {
         try {
@@ -40,7 +43,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
             })
             setConvList(response.data.data)
         } catch (error) {
-            console.log(error)
             setIsErrorConv(true);
         } finally {
             setIsLoadingConv(false);
@@ -49,47 +51,56 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
     const fetchMessage = useCallback(async () => {
         try {
+            const convToFetch = convList?.find((conv) => conv._id === convId);
+            if (!convToFetch || !convId || convToFetch._id === activeConv?._id) return;
+
             setIsErrorActiveConv(false);
             setIsLoadingActiveConv(true);
-            const response = await axios.get(`${import.meta.env.VITE_BASE_URL}/api/chat/chatMessage/${convId}`, {
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
-            })
-            setActiveConv(response.data.data);
+            const response = await axios.get(`${import.meta.env.VITE_BASE_URL}/api/chat/chatMessage/${convId}`,
+                { headers: { Authorization: `Bearer ${token}` } })
+
+            const newActiveConv = { ...convToFetch, messages: response.data.data };
+            setActiveConv(newActiveConv);
+
+            const updatedConvList = convList?.map((conv) => conv._id === convId ? { ...conv, unreadMessageCount: 0 } : conv)
+            if (!updatedConvList) return;
+
+            setConvList(updatedConvList);
         } catch (error) {
-            console.log(true);
             setIsErrorActiveConv(true)
         } finally {
             setIsLoadingActiveConv(false);
         }
-    }, [token, convId])
-
-    const markConversationAsRead = useCallback(() => {
-        setConvList((prevList) =>
-            prevList?.map((conv) =>
-                conv._id === convId ? { ...conv, unreadMessageCount: 0 } : conv
-            ) || null
-        );
-    }, [convId]);
+    }, [convList, convId, activeConv?._id, token])
 
     useEffect(() => {
         fetchConversation();
     }, [fetchConversation])
 
     useEffect(() => {
-        (async () => {
-            if (convId) {
-                await fetchMessage()
-                markConversationAsRead();
-            }
-        })()
-    }, [convId, fetchMessage, markConversationAsRead])
+        if (!convId || convId === activeConv?._id) return;
+        fetchMessage();
+    }, [fetchMessage, convId, activeConv]);
+
+    useEffect(() => {
+        const handleReceiveNewMessage = (payload: MessageType) => {
+            if (!activeConv || activeConv._id !== payload.conversation) return;
+
+            const updatedConvList = activeConv?.messages.length ?
+                [payload, ...activeConv.messages] : [payload]
+            setActiveConv({ ...activeConv, messages: updatedConvList })
+        }
+
+        socket.on("receive:newMessage", handleReceiveNewMessage)
+        return () => {
+            socket.off("receive:newMessage", handleReceiveNewMessage)
+        }
+    }, [activeConv, socket])
 
     return <ChatContext.Provider value={{
         convList, isErrorConv, isLoadingConv,
         activeConv, isErrorActiveConv, isLoadingActiveConv,
-        fetchMessage,
+        fetchMessage, setActiveConv,
         fetchConversation
     }}>
         {children}

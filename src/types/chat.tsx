@@ -39,3 +39,7 @@ export type ChatListType = {
     updatedAt: string,
     unreadMessageCount: number
 }
+
+export type ActiveConvType = ChatListType & {
+    messages: MessageType[];
+}
