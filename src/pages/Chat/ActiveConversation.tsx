@@ -7,6 +7,8 @@ import ReceivedMessage from './ReceivedMessage';
 import useChatContext from "../../hooks/useChatContext";
 import useSocketContext from "../../hooks/useSocketContext";
 import { MessageType, ChatListType } from "../../types/chat";
+import { setMessages } from "../../actions/chatActions";
+// import { appendNewMessage } from "../../actions/convListAction";
 
 type SentMessageResponseType = {
     success: boolean,
@@ -18,7 +20,7 @@ type SentMessageResponseType = {
 const ActiveConversation = () => {
     const { user, logoutState } = useContext(AuthContext);
     const { socket } = useSocketContext()
-    const { activeConv, setActiveConv } = useChatContext();
+    const { chatState, dispatchChat } = useChatContext();
     const [newMessage, setNewMessage] = useState("");
     const [assets,] = useState([]);
     if (!user) logoutState();
@@ -27,14 +29,14 @@ const ActiveConversation = () => {
         e.preventDefault()
         if (newMessage === "") return;
 
-        const receiverEmail = activeConv?.participants.filter((partcipant) => partcipant._id != user?._id) || []
+        const receiverEmail = chatState?.activeConv?.participants.filter((partcipant) => partcipant._id != user?._id) || []
         const sentMessage = {
             assets,
             _id: uuid(),
             text: newMessage,
             sender: user?._id,
-            type: activeConv?.type,
-            conversationId: activeConv?._id,
+            type: chatState?.activeConv?.type,
+            conversationId: chatState?.activeConv?._id,
             receiverEmail: receiverEmail[0].email,
         }
         socket.emit("send:newMessage", sentMessage);
@@ -43,25 +45,34 @@ const ActiveConversation = () => {
 
     useEffect(() => {
         const messageUpdateEvent = (payload: SentMessageResponseType) => {
+            if(!chatState) return;
+            const {convList} = chatState;
             const sentMessageResponse = payload.message;
             const updatedMessage = { ...sentMessageResponse, conversation: sentMessageResponse.conversation._id }
-            if (!activeConv || updatedMessage.conversation !== activeConv._id) return;
-            const updatedConvList = activeConv?.messages.length ?
-                [updatedMessage, ...activeConv.messages] :
-                [updatedMessage]
+            if (!chatState?.activeConv || updatedMessage.conversation !== chatState?.activeConv._id || !convList) return;
 
-            setActiveConv({ ...activeConv, messages: updatedConvList })
+            // const unreadMessageCount = 0;
+            // const newConversation = { ...sentMessageResponse.conversation, unreadMessageCount };
+            // let updatedConvList = convList.filter((conv) => conv._id !== sentMessageResponse.conversation._id)
+            // updatedConvList = [newConversation, ...updatedConvList]
+            // setConvList(updatedConvList);
+            // dispatchConvList(appendNewMessage(sentMessageResponse.conversation))
+
+            const newMessagePayload = chatState?.activeConv?.messages.length ?
+                [updatedMessage, ...chatState.activeConv.messages] :
+                [updatedMessage]
+            dispatchChat(setMessages(newMessagePayload))
         }
 
         socket.on("messageSent", messageUpdateEvent)
         return () => {
             socket.off('messageSent', messageUpdateEvent)
         }
-    }, [activeConv, setActiveConv, socket])
+    }, [chatState, chatState?.activeConv, dispatchChat, socket])
 
     return <div className="h-screen flex flex-col w-2/3">
         <div className="flex flex-col-reverse overflow-y-scroll custom-scrollbar h-full">
-            {activeConv?.messages.map((msg) => (
+            {chatState?.activeConv?.messages.map((msg) => (
                 msg.sender === user?._id ?
                     <SentMessage key={uuid()} message={msg} /> :
                     <ReceivedMessage key={uuid()} message={msg} />

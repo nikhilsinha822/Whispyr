@@ -8,7 +8,7 @@ type MessagePropsType = {
 
 const SentMessage: React.FC<MessagePropsType> = ({ message }) => {
     const time = new Date(message.createdAt);
-    const messageTime = (time.getHours() % 13).toString().padStart(2, '0') + ":" + (time.getMinutes().toString().padStart(2, '0')) + `${time.getHours() >= 12 ? " PM " : " AM "}`;
+    const messageTime = (time.getHours() % 12).toString().padStart(2, '0') + ":" + (time.getMinutes().toString().padStart(2, '0')) + `${time.getHours() >= 12 ? " PM " : " AM "}`;
     const messageStatus = Math.min(...message.readBy.map((read) => read.status))
 
     return <div className="bg-blue-500 text-white p-2 max-w-md rounded-md my-1 mx-2 ml-auto flex flex-wrap">

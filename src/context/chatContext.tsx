@@ -1,17 +1,19 @@
-import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from "react"
-import { ChatListType, ActiveConvType } from "../types/chat"
+import { createContext, ReactNode, useCallback, useContext, useEffect, useState, useReducer } from "react"
+import { ChatListType } from "../types/chat"
 import axios from "axios"
 import { AuthContext } from "./authContext";
 import { useSearchParams } from "react-router-dom";
 import useSocketContext from "../hooks/useSocketContext";
 import { MessageType } from "../types/chat";
+import { ChatAction, chatStateType } from "../reducers/chatReducers";
+import { addMessageActive, setActiveConv, updateMessageStatus, setConvList, appendNewMessage, updateConvSeen } from "../actions/chatActions";
+import { chatReducer } from "../reducers/chatReducers";
 
 type ChatContextType = {
-    convList: ChatListType[] | null;
     isErrorConv: boolean;
     isLoadingConv: boolean;
-    activeConv: ActiveConvType | null;
-    setActiveConv: React.Dispatch<React.SetStateAction<ActiveConvType | null>>;
+    chatState: chatStateType
+    dispatchChat: React.Dispatch<ChatAction>
     isErrorActiveConv: boolean;
     isLoadingActiveConv: boolean;
     fetchConversation: () => void;
@@ -24,17 +26,17 @@ type ReceivedMessagePayloadType = Omit<MessageType, 'conversation'> & {
 
 export const ChatContext = createContext<ChatContextType | undefined>(undefined)
 
+
 export const ChatProvider = ({ children }: { children: ReactNode }) => {
-    const { token } = useContext(AuthContext);
+    const { user, token } = useContext(AuthContext);
     const [searchParams,] = useSearchParams();
     const convId = searchParams.get('activeConv') || null;
-    const [convList, setConvList] = useState<ChatListType[] | null>(null);
     const [isErrorConv, setIsErrorConv] = useState(false);
     const [isLoadingConv, setIsLoadingConv] = useState(false);
-    const [activeConv, setActiveConv] = useState<ActiveConvType | null>(null);
     const [isErrorActiveConv, setIsErrorActiveConv] = useState(false);
     const [isLoadingActiveConv, setIsLoadingActiveConv] = useState(false);
     const { socket } = useSocketContext()
+    const [chatState, dispatchChat] = useReducer(chatReducer, null)
 
     const fetchConversation = useCallback(async () => {
         try {
@@ -45,7 +47,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
                     Authorization: `Bearer ${token}`
                 }
             })
-            setConvList(response.data.data)
+            const convListResponse = response.data.data
+            dispatchChat(setConvList(convListResponse))
         } catch (error) {
             setIsErrorConv(true);
         } finally {
@@ -55,6 +58,9 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
     const fetchMessage = useCallback(async () => {
         try {
+            if (!chatState) return;
+            const { convList, activeConv } = chatState;
+
             const convToFetch = convList?.find((conv) => conv._id === convId);
             if (!convToFetch || !convId || convToFetch._id === activeConv?._id) return;
 
@@ -64,89 +70,108 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
                 { headers: { Authorization: `Bearer ${token}` } })
 
             const newActiveConv = { ...convToFetch, messages: response.data.data };
-            setActiveConv(newActiveConv);
-
-            const updatedConvList = convList?.map((conv) => conv._id === convId ? { ...conv, unreadMessageCount: 0 } : conv)
-            if (!updatedConvList) return;
-
-            setConvList(updatedConvList);
+            dispatchChat(setActiveConv({ convId, activeConv: newActiveConv }))
         } catch (error) {
             setIsErrorActiveConv(true)
         } finally {
             setIsLoadingActiveConv(false);
         }
-    }, [convList, convId, activeConv?._id, token])
+    }, [chatState, convId, token])
 
     useEffect(() => {
         fetchConversation();
     }, [fetchConversation])
 
     useEffect(() => {
-        if (!convId || convId === activeConv?._id) return;
-        fetchMessage();
-    }, [fetchMessage, convId, activeConv]);
+        if (!convId || convId === chatState?.activeConv?._id) return;
+        fetchMessage()
+            .then(() => socket.emit('send:seenConversation', { userId: user?._id, conversation: convId }))
+            .catch(err => console.log(err))
+        
+    }, [fetchMessage, convId, chatState?.activeConv?._id, socket, user?._id]);
 
     useEffect(() => {
         const handleReceiveNewMessage = (payload: ReceivedMessagePayloadType) => {
-            if (!convList) return;
+            if (!chatState?.convList) return;
 
-            const unreadMessageCount = (convList.find((conv) => conv._id == payload.conversation._id)?.unreadMessageCount || 0) + 1;
-            const newConversation = { ...payload.conversation, unreadMessageCount };
-            let updatedConvList = convList.filter((conv) => conv._id !== payload.conversation._id)
-            updatedConvList = [newConversation, ...updatedConvList]
-            setConvList(updatedConvList);
-            socket.emit("send:receivedMessage", { messageID: payload._id })
-
-            if (!activeConv || activeConv._id !== payload.conversation._id) return;
-
-            const newMessagePayload = { ...payload, conversation: payload.conversation._id }
-            const updatedMessages = activeConv?.messages.length ?
-                [newMessagePayload, ...activeConv.messages] : [newMessagePayload]
-            setActiveConv({ ...activeConv, messages: updatedMessages })
-            socket.emit("send:seenMessage", { messageID: payload._id })
+            if (!chatState?.activeConv || chatState?.activeConv._id !== payload.conversation._id) {
+                dispatchChat(appendNewMessage(payload.conversation))
+                socket.emit("send:receivedMessage", { messageID: payload._id })
+            } else {
+                const newMessagePayload = { ...payload, conversation: payload.conversation._id }
+                dispatchChat(addMessageActive({ conversation: payload.conversation, message: newMessagePayload }));
+                socket.emit("send:seenMessage", { messageID: payload._id })
+            }
         }
 
         socket.on("receive:newMessage", handleReceiveNewMessage)
+
         return () => {
             socket.off("receive:newMessage", handleReceiveNewMessage)
         }
-    }, [activeConv, convList, socket])
+    }, [chatState?.activeConv, chatState?.convList, socket])
 
     useEffect(() => {
         const handleMessageStatus = (payload: MessageType) => {
-            if (!activeConv || payload.conversation !== activeConv?._id) return;
+            if (!chatState?.activeConv || payload.conversation !== chatState?.activeConv?._id) return;
 
             const updatedStatus = payload.readBy;
-            const messageToUpdate = activeConv.messages.find((message) => message._id === payload._id)
-            if(!messageToUpdate) return;
+            const messageToUpdate = chatState?.activeConv.messages.find((message) => message._id === payload._id)
+            if (!messageToUpdate) return;
 
             const status = messageToUpdate.readBy.map((oldStat) => {
                 const newStatus = updatedStatus.find((stat) => stat._id === oldStat._id)
-                if(!newStatus) return oldStat;
+                if (!newStatus) return oldStat;
                 return { ...oldStat, status: Math.max(Number(oldStat.status), Number(newStatus.status)) }
             })
-            console.log("before=>", messageToUpdate.readBy, "update=>",updatedStatus, "after=>", status)
 
-            const updatedMessage = activeConv.messages.map(
-                (message) => message._id === payload._id ? { ...payload, readBy: status } : message)
+            dispatchChat(updateMessageStatus({ messageId: payload._id, readBy: status }))
+        }
 
-            setActiveConv({ ...activeConv, messages: updatedMessage })
+        const handleMessageSeen = (payload: MessageType) => {
+            if (!chatState?.activeConv || payload.conversation !== chatState?.activeConv?._id) return;
+
+            const updatedStatus = payload.readBy;
+            const messageToUpdate = chatState?.activeConv.messages.find((message) => message._id === payload._id)
+            if (!messageToUpdate) return;
+
+            const status = messageToUpdate.readBy.map((oldStat) => {
+                const newStatus = updatedStatus.find((stat) => stat._id === oldStat._id)
+                if (!newStatus) return oldStat;
+                return { ...oldStat, status: Math.max(Number(oldStat.status), Number(newStatus.status)) }
+            })
+
+            dispatchChat(updateMessageStatus({ messageId: payload._id, readBy: status }))
         }
 
         socket.on("receive:receivedMessage", handleMessageStatus)
-        socket.on("receive:seenMessage", handleMessageStatus)
+        socket.on("receive:seenMessage", handleMessageSeen)
 
         return () => {
             socket.off("receive:receivedMessage", handleMessageStatus)
             socket.off("receive:seenMessage", handleMessageStatus)
+            // socket.off("receive:seenConversation", handleConversationSeen)
         }
-    }, [activeConv, socket])
+    }, [chatState?.activeConv, socket])
+
+    useEffect(() => {
+        const handleConversationSeen = (payload: { userId: string, conversation: string }) => {
+            console.log("handle see conversation", payload.userId, payload.conversation);
+            dispatchChat(updateConvSeen(payload));
+        }
+
+        socket.on("receive:seenConversation", handleConversationSeen)
+
+        return () => {
+            socket.off("receive:seenConversation", handleConversationSeen)
+        }
+    }, [socket])
 
     return <ChatContext.Provider value={{
-        convList, isErrorConv, isLoadingConv,
-        activeConv, isErrorActiveConv, isLoadingActiveConv,
-        fetchMessage, setActiveConv,
-        fetchConversation
+        isErrorConv, isLoadingConv,
+        isErrorActiveConv, isLoadingActiveConv,
+        chatState, dispatchChat,
+        fetchMessage, fetchConversation
     }}>
         {children}
     </ChatContext.Provider>

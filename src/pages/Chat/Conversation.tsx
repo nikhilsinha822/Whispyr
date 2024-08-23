@@ -3,12 +3,12 @@ import useChatContext from "../../hooks/useChatContext";
 import ActiveConversation from './ActiveConversation';
 
 const Conversation = () => {
-    const { activeConv, isErrorActiveConv, isLoadingActiveConv} = useChatContext()
+    const { chatState, isErrorActiveConv, isLoadingActiveConv} = useChatContext()
 
     if (isLoadingActiveConv)
         return <div>Loading Conversation...</div>
 
-    if (!activeConv || isErrorActiveConv)
+    if (!chatState?.activeConv || isErrorActiveConv)
         return (
             <div className="w-2/3 h-screen flex flex-col items-center justify-center bg-dotted-pattern">
                 <img src={logo} alt="Whispyr" />

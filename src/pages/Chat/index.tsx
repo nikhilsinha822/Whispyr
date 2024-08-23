@@ -11,13 +11,13 @@ type ConversationPropsType = {
 }
 
 const Chat = () => {
-    const { convList, isErrorConv, isLoadingConv } = useChatContext();
+    const { chatState, isErrorConv, isLoadingConv } = useChatContext();
     const [, setSearchParams] = useSearchParams();
 
     if (isLoadingConv)
         return <div>Loading...</div>
 
-    if (isErrorConv || !convList)
+    if (isErrorConv || !chatState?.convList)
         return <div>There was some problem is loading the chats.</div>
 
     return <div className='flex'>
@@ -26,7 +26,7 @@ const Chat = () => {
                 <h2 className="text-xl sm:text-2xl font-bold text-white">Conversations</h2>
             </div>
             <div className="divide-y divide-gray-200">
-                {convList.map((conv) => (
+                {chatState?.convList.map((conv) => (
                     <div key={uuid()}
                         className="hover:cursor-pointer"
                         onClick={() => setSearchParams({ activeConv: conv._id }, { replace: true })}
