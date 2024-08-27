@@ -4,15 +4,21 @@ import AuthComponent from "./components/AuthComponent"
 import SignInPage from "./pages/SignIn"
 import SignUpPage from './pages/SignUp'
 import Chat from "./pages/Chat"
+import ForgetPasswordPage from "./pages/forgetPassword"
+import EmailSentPage from "./pages/EmailSent"
+import ResetPasswordPage from "./pages/ResetPassword"
 
 const App = () => {
   return (
     <AuthProvider>
-        <Routes>
-          <Route index path="/" element={<AuthComponent children={<Chat />} />} />
-          <Route path="/signin" element={<SignInPage />} />
-          <Route path="/signup" element={<SignUpPage />} />
-        </Routes>
+      <Routes>
+        <Route index path="/" element={<AuthComponent children={<Chat />} />} />
+        <Route path="/signin" element={<SignInPage />} />
+        <Route path="/signup" element={<SignUpPage />} />
+        <Route path="forgot-password" element={<ForgetPasswordPage />} />
+        <Route path="reset-email" element={<EmailSentPage />} />
+        <Route path="resetPassword" element={<ResetPasswordPage />} />
+      </Routes>
     </AuthProvider>
   )
 }
