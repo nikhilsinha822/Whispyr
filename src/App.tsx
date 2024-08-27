@@ -7,6 +7,7 @@ import Chat from "./pages/Chat"
 import ForgetPasswordPage from "./pages/forgetPassword"
 import EmailSentPage from "./pages/EmailSent"
 import ResetPasswordPage from "./pages/ResetPassword"
+import RegisterEmailSentPage from "./pages/RegisterEmail"
 
 const App = () => {
   return (
@@ -18,6 +19,7 @@ const App = () => {
         <Route path="forgot-password" element={<ForgetPasswordPage />} />
         <Route path="reset-email" element={<EmailSentPage />} />
         <Route path="resetPassword" element={<ResetPasswordPage />} />
+        <Route path="verifyEmail" element={<RegisterEmailSentPage />} />
       </Routes>
     </AuthProvider>
   )
