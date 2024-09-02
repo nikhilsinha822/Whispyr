@@ -14,8 +14,8 @@ const App = () => {
     <AuthProvider>
       <Routes>
         <Route index path="/" element={<AuthComponent children={<Chat />} />} />
-        <Route path="/signin" element={<SignInPage />} />
-        <Route path="/signup" element={<SignUpPage />} />
+        <Route path="signin" element={<SignInPage />} />
+        <Route path="signup" element={<SignUpPage />} />
         <Route path="forgot-password" element={<ForgetPasswordPage />} />
         <Route path="reset-email" element={<EmailSentPage />} />
         <Route path="resetPassword" element={<ResetPasswordPage />} />
